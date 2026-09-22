@@ -43,8 +43,7 @@ class InteractionManager {
                         y: this.renderer.height / 2,
                         material: item.dataset.material || 'normal'
                     });
-                    this.canvasManager.addLens(lens);
-                    this.canvasManager.selectLens(lens);
+                    this.canvasManager.placeLibraryLens(lens);
                     Utils.showToast('透镜已添加', 'success');
                 });
             }

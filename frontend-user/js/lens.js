@@ -59,6 +59,20 @@ class Lens {
         const baseWidth = this.type === CONFIG.LENS_TYPES.PLANO ? 8 : 30;
         return baseWidth * (this.size / 100) * (this.curvature / 50);
     }
+
+    /**
+     * 获取交互区域半宽（含点击冗余）
+     */
+    getHitHalfWidth() {
+        return this.getWidth() / 2 + 10;
+    }
+
+    /**
+     * 获取交互区域半高（含点击冗余）
+     */
+    getHitHalfHeight() {
+        return this.getHeight() / 2 + 10;
+    }
     
     /**
      * 获取焦距
@@ -76,8 +90,8 @@ class Lens {
      * 检测点是否在透镜内
      */
     containsPoint(px, py) {
-        const halfWidth = this.getWidth() / 2 + 10; // 增加点击区域
-        const halfHeight = this.getHeight() / 2 + 10;
+        const halfWidth = this.getHitHalfWidth();
+        const halfHeight = this.getHitHalfHeight();
         
         return px >= this.x - halfWidth && 
                px <= this.x + halfWidth &&

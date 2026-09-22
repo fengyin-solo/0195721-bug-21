@@ -24,6 +24,14 @@ class CanvasManager {
         window.addEventListener('resize', Utils.debounce(() => {
             this.handleResize();
         }, 100));
+
+        // 画布容器尺寸变化（窄屏布局切换、侧边栏伸缩等都会触发）
+        if (typeof ResizeObserver !== 'undefined') {
+            this.resizeObserver = new ResizeObserver(Utils.debounce(() => {
+                this.handleResize();
+            }, 100));
+            this.resizeObserver.observe(this.wrapper);
+        }
         
         // 鼠标事件
         this.canvas.addEventListener('mousedown', (e) => this.handlePointerDown(e));
@@ -80,15 +88,42 @@ class CanvasManager {
         return { x, y };
     }
     
+    /**
+     * 窗口或容器尺寸变化：
+     * 仅让画布与两侧面板重新协调（重设分辨率并重绘网格/光轴），
+     * 透镜坐标保持不变，网格间距与渲染比例也不受影响。
+     */
     handleResize() {
         this.renderer.resize();
-        
-        this.lenses.forEach(lens => {
-            lens.x = Utils.clamp(lens.x, 50, this.renderer.width - 50);
-            lens.y = Utils.clamp(lens.y, 50, this.renderer.height - 50);
-        });
-        
-        this.renderer.setLenses(this.lenses);
+    }
+
+    /**
+     * 将透镜位置限制在画布可见范围内（拖动与从素材库添加共用这一份限制）。
+     * 边界依据透镜自身的交互占位尺寸，而不是固定常量。
+     * 返回是否发生了越界收回。
+     */
+    constrainLensPosition(lens, x, y) {
+        const width = this.renderer.width;
+        const height = this.renderer.height;
+
+        // 画布过窄/过矮时退化为中线，避免 min > max
+        const marginX = Math.min(lens.getHitHalfWidth(), width / 2);
+        const marginY = Math.min(lens.getHitHalfHeight(), height / 2);
+
+        const minX = marginX;
+        const maxX = width - marginX;
+        const minY = marginY;
+        const maxY = height - marginY;
+
+        const constrainedX = Utils.clamp(x, minX, maxX);
+        const constrainedY = Utils.clamp(y, minY, maxY);
+
+        const wasOutOfBounds = constrainedX !== x || constrainedY !== y;
+
+        lens.x = constrainedX;
+        lens.y = constrainedY;
+
+        return wasOutOfBounds;
     }
     
     handlePointerDown(e) {
@@ -109,20 +144,15 @@ class CanvasManager {
     
     handlePointerMove(e) {
         if (!this.isDragging || !this.selectedLens) return;
-        
+
         const pos = this.getPointerPos(e);
-        
-        this.selectedLens.x = Utils.clamp(
+
+        this.constrainLensPosition(
+            this.selectedLens,
             pos.x - this.dragOffset.x,
-            50,
-            this.renderer.width - 50
+            pos.y - this.dragOffset.y
         );
-        this.selectedLens.y = Utils.clamp(
-            pos.y - this.dragOffset.y,
-            50,
-            this.renderer.height - 50
-        );
-        
+
         this.renderer.render();
     }
     
@@ -143,24 +173,43 @@ class CanvasManager {
     handleDrop(e) {
         e.preventDefault();
         document.getElementById('canvas-drop-hint').classList.add('hidden');
-        
+
         const lensType = e.dataTransfer.getData('lens-type');
         const material = e.dataTransfer.getData('lens-material');
-        
+
         if (!lensType) return;
-        
+
         const pos = this.getPointerPos(e);
-        
+
         const lens = new Lens({
             type: lensType,
             x: pos.x,
             y: pos.y,
             material: material || 'normal'
         });
-        
+
+        // 与拖动已有透镜共用同一份越界限制，越界时收回边界内
+        const wasOutOfBounds = this.placeLibraryLens(lens);
+
+        if (wasOutOfBounds) {
+            Utils.showToast('透镜超出画布可见范围，已自动收回边界内，可重新拖动调整', 'warning', 3000);
+        } else {
+            Utils.showToast('透镜已添加', 'success');
+        }
+    }
+
+    /**
+     * 放置从素材库添加的透镜（拖放与触屏点击共用）。
+     * 位置先经过可见范围限制，再加入画布并选中。
+     * 返回是否发生了越界收回。
+     */
+    placeLibraryLens(lens) {
+        const wasOutOfBounds = this.constrainLensPosition(lens, lens.x, lens.y);
+
         this.addLens(lens);
         this.selectLens(lens);
-        Utils.showToast('透镜已添加', 'success');
+
+        return wasOutOfBounds;
     }
     
     addLens(lens) {
