@@ -43,6 +43,10 @@ class InteractionManager {
                         y: this.renderer.height / 2,
                         material: item.dataset.material || 'normal'
                     });
+                    // 与拖放、拖动使用同一份越界限制
+                    const result = this.canvasManager.constrainLensToBounds(lens);
+                    lens.x = result.x;
+                    lens.y = result.y;
                     this.canvasManager.addLens(lens);
                     this.canvasManager.selectLens(lens);
                     Utils.showToast('透镜已添加', 'success');

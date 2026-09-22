@@ -51,13 +51,39 @@ class Lens {
     getHeight() {
         return 80 * (this.size / 100);
     }
-    
+
     /**
      * 获取透镜宽度
      */
     getWidth() {
         const baseWidth = this.type === CONFIG.LENS_TYPES.PLANO ? 8 : 30;
         return baseWidth * (this.size / 100) * (this.curvature / 50);
+    }
+
+    /**
+     * 获取透镜相对中心的实际绘制包围盒
+     * 用于把透镜限制在可见画布范围内（数值与 renderer 的绘制路径保持一致）
+     */
+    getBounds() {
+        const halfHeight = this.getHeight() / 2;
+        let halfWidth;
+
+        switch (this.type) {
+            case CONFIG.LENS_TYPES.PLANO:
+                halfWidth = 4;
+                break;
+            case CONFIG.LENS_TYPES.CONCAVE:
+                // 矩形边缘位于 ±edgeWidth，曲线不超出该范围
+                halfWidth = this.getWidth() * 0.3;
+                break;
+            case CONFIG.LENS_TYPES.CONVEX:
+            case CONFIG.LENS_TYPES.ASPHERIC:
+            default:
+                // 凸起控制点/终点位于 ±curveAmount
+                halfWidth = this.getWidth() * (this.curvature / 100);
+        }
+
+        return { halfWidth, halfHeight };
     }
     
     /**
